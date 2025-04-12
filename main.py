@@ -1,59 +1,69 @@
-import book_info
-import review_crawler
-import review_processor
-import semantic_filter
-import outline_generator
-import question_generator
-import interview
-import review_writer
-from utils.io import save_text
+from book_info import get_book_context
+from review_crawler import get_reviews
+from review_processor import process_reviews
+from outline_generator import generate_subtopics
+from utils.io import select_items_from_list, save_review_to_file
+from interview import ask_interview_questions, conduct_interview
+from question_generator import generate_guided_questions
+from review_writer import write_chapter_from_answers
 
-if __name__ == "__main__":
-    # 1. 사용자로부터 책 제목 입력 받기
-    title = input("책 제목을 입력하세요: ").strip()
-    if not title:
-        print("책 제목을 입력하지 않아 프로그램을 종료합니다.")
-        exit(0)
-    print("책 정보 수집 중...")
+print("📘 책 리뷰 생성기에 오신 걸 환영합니다!")
 
-    # 2. 책 기본 정보 가져오기 (저자, 장르, 줄거리 등)
-    book_info_text = book_info.get_book_info(title)
+# 1. 책 정보 입력
+title = input("책 제목을 입력하세요: ").strip()
+author = input("저자명을 입력하세요: ").strip()
+print("\n[책 정보 수집 중...]\n")
 
-    # 3. 책 정보를 바탕으로 독자 관심사 키워드 생성
-    print("독자 관심사 분석 중...")
-    user_points = semantic_filter.get_user_keywords(book_info_text, title)
+# 2. 책 정보 요약
+book_context = get_book_context(title, author)
 
-    # 4. 해당 책의 독자 리뷰 크롤링
-    print("독자 리뷰 수집 중...")
-    reviews = review_crawler.get_reviews(title)
+# 3. 리뷰 수집 및 키워드 추출
+reviews = get_reviews(title)
+review_points = process_reviews(title, reviews)
 
-    # 5. 리뷰 내용 요약 및 핵심 포인트 추출
-    print("리뷰 분석 중...")
-    review_points = review_processor.process_reviews(title, reviews)
+# 5. 유저가 인터뷰 응답
+questions = ask_interview_questions(book_context, review_points, title)
+user_responses = conduct_interview(book_context, review_points, questions)
 
-    # 6. 리뷰 포인트와 독자 관심사를 통합 (semantic filter)
-    combined_points = semantic_filter.filter_points(review_points, user_points)
+# 6. 유저 응답 + 책 정보 + 리뷰 키워드 기반으로 소제목 후보 생성
+subtopic_candidates = generate_subtopics(user_responses, book_context, review_points, title)
 
-    # 7. 책 리뷰 아웃라인 생성
-    print("아웃라인 생성 중...")
-    outline = outline_generator.generate_outline(title, book_info_text, review_points, user_points)
+# 7. 유저가 소제목 선택
+selected_subtopics = select_items_from_list(
+    subtopic_candidates,
+    "리뷰에 포함할 소제목을 2~5개 선택해주세요:",
+    min_select=2,
+    max_select=5
+)
 
-    # 8. 각 아웃라인 섹션에 대한 가이드 질문 생성
-    print("가이드 질문 생성 중...")
-    questions = question_generator.generate_questions(outline, review_points, user_points)
+# 8. 각 챕터 작성
+chapters = []
+for subtopic in selected_subtopics:
+    print(f"\n[챕터: {subtopic}]")
+    print("1. 직접 작성하기")
+    print("2. 질문 받고 작성하기 (GPT가 인터뷰 후 챕터 자동 생성)")
+    mode = input("선택 (1 또는 2): ").strip()
 
-    # 9. 생성된 질문으로 인터뷰(질의응답) 수행하여 답변 얻기
-    print("인터뷰 진행 중...")
-    answers = interview.conduct_interview(book_info_text, combined_points, questions)
+    if mode == "1":
+        content = input(f"\n'{subtopic}'에 대한 내용을 자유롭게 작성해주세요:\n> ")
+    else:
+        # GPT가 해당 소제목에 대해 질문 생성
+        guided_questions = generate_guided_questions(subtopic, book_context, review_points)
+        answers = {}
+        print("\n[아래 질문에 답해주세요:]")
+        for idx, q in enumerate(guided_questions, start=1):
+            print(f"\n[{idx}/{len(guided_questions)}] {q}")
+            ans = input("> ")
+            answers[q] = ans.strip()
+        content = write_chapter_from_answers(subtopic, answers, book_context, review_points)
 
-    # 10. 아웃라인과 Q&A를 바탕으로 최종 리뷰 작성
-    print("리뷰 작성 중...")
-    final_review = review_writer.write_review(outline, questions, answers)
+    chapters.append({"title": subtopic, "content": content})
 
-    # 11. 최종 생성된 리뷰 출력
-    print("\n생성된 책 리뷰:\n")
-    print(final_review)
+# 10. 리뷰 조립 및 저장
+final_review = f"# 『{title}』 리뷰\n\n"
+for chapter in chapters:
+    final_review += f"## {chapter['title']}\n{chapter['content']}\n\n"
 
-    # 12. 리뷰를 파일로 저장
-    save_text("review_output.txt", final_review)
-    print("\n(리뷰가 review_output.txt 파일에도 저장되었습니다.)")
+save_review_to_file(final_review, filename=f"{title}_review.txt")
+print("\n✅ 리뷰가 성공적으로 생성되어 저장되었습니다!")
+print(f"📄 파일명: {title}_review.txt")

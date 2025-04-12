@@ -3,31 +3,34 @@ from bs4 import BeautifulSoup
 
 def get_reviews(title: str) -> list:
     """
-    책 제목으로 인터넷에서 독자 리뷰들을 가져옵니다 (예: Goodreads 검색).
+    주어진 책 제목을 기반으로 YES24 검색 결과에서 리뷰 텍스트를 크롤링합니다.
     """
-    reviews = []
+    print("📡 YES24에서 리뷰를 수집 중입니다...")
+
+    search_url = f"https://www.yes24.com/Product/Search?domain=BOOK&query={title}"
+    headers = {
+        "User-Agent": "Mozilla/5.0"
+    }
+
     try:
-        # Goodreads에서 책 검색
-        search_url = f"https://www.goodreads.com/search?q={requests.utils.requote_uri(title)}"
-        resp = requests.get(search_url, timeout=10)
-        if resp.status_code == 200:
-            soup = BeautifulSoup(resp.text, "html.parser")
-            # 첫번째 검색 결과의 책 페이지로 이동
-            first_result = soup.find("a", class_="bookTitle")
-            if first_result and 'href' in first_result.attrs:
-                book_page_url = "https://www.goodreads.com" + first_result['href']
-                page = requests.get(book_page_url, timeout=10)
-                if page.status_code == 200:
-                    soup_book = BeautifulSoup(page.text, "html.parser")
-                    # 리뷰 텍스트 부분 추출 (상위 5개 리뷰만)
-                    review_elems = soup_book.find_all("div", {"class": "reviewText"})
-                    if not review_elems:
-                        review_elems = soup_book.find_all("div", {"class": "reviewText stacked"})
-                    for elem in review_elems[:5]:
-                        text = elem.get_text(separator=" ", strip=True)
-                        if text:
-                            reviews.append(text)
+        search_res = requests.get(search_url, headers=headers)
+        soup = BeautifulSoup(search_res.text, "html.parser")
+        first_link = soup.select_one("div.goodsList_info a.gd_name")
+        if not first_link:
+            print("❌ 책을 찾을 수 없습니다.")
+            return []
+
+        book_url = "https://www.yes24.com" + first_link["href"]
+        book_res = requests.get(book_url, headers=headers)
+        book_soup = BeautifulSoup(book_res.text, "html.parser")
+
+        # 리뷰 영역 찾기
+        review_elements = book_soup.select("div.reviewInfoBot.cropContentsReview")
+        reviews = [r.get_text(strip=True) for r in review_elements]
+
+        print(f"✅ 리뷰 {len(reviews)}건 수집 완료.")
+        return reviews[:10]  # 최대 10개만 반환
+
     except Exception as e:
-        print(f"(리뷰 수집 중 오류: {e})")
-    # 리뷰를 찾지 못한 경우 reviews 리스트는 빈 상태로 반환됩니다.
-    return reviews
+        print(f"❌ 리뷰 수집 중 오류 발생: {e}")
+        return []

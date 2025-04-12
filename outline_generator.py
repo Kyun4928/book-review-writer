@@ -1,25 +1,24 @@
-from utils.io import load_text, parse_list
+from utils.io import load_text
 import llm_client
 
-def generate_outline(title: str, book_info_text: str, review_points: list, user_points: list) -> list:
+def generate_subtopics(user_responses: list, book_context: str, review_points: list, title: str) -> list:
     """
-    책 정보, 리뷰 포인트, 독자 관심사를 기반으로 리뷰 아웃라인을 생성합니다.
+    유저의 감상, 책 정보, 리뷰 키워드를 종합해 GPT에게 리뷰용 소제목 후보를 요청합니다.
     """
-    # 리뷰 포인트 목록 문자열 생성 (없으면 '없음')
-    review_points_str = "없음"
-    if review_points:
-        review_points_str = "\n".join(f"- {pt}" for pt in review_points)
-    # 독자 관심사 목록 문자열 생성 (없으면 '없음')
-    user_points_str = "없음"
-    if user_points:
-        user_points_str = "\n".join(f"- {pt}" for pt in user_points)
     prompt_template = load_text("prompts/subtopics.txt")
+
+    formatted_responses = "\n".join(f"- {resp}" for resp in user_responses)
+    formatted_keywords = "\n".join(f"- {rp}" for rp in review_points)
+
     prompt = prompt_template.format(
         title=title,
-        book_info=book_info_text.strip(),
-        review_points=review_points_str,
-        user_points=user_points_str
+        book_context=book_context,
+        review_points=formatted_keywords,
+        user_responses=formatted_responses
     )
-    result = llm_client.ask(prompt)
-    outline_list = parse_list(result)
-    return outline_list
+
+    response = llm_client.ask(prompt)
+    subtopics = [line.strip("- ").strip() for line in response.strip().splitlines() if line.strip()]
+
+    print(f"🧩 소제목 후보 {len(subtopics)}개 생성됨.")
+    return subtopics
