@@ -23,7 +23,7 @@ def async_task_with_progress(task_func, progress_desc, *args, **kwargs):
     비동기로 작업을 실행하면서 진행 상태를 표시합니다.
     """
     result = [None]
-    exception = [None]
+    exception = {}
     completed = [False]
 
     def worker():
