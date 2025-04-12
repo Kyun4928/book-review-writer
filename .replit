@@ -1,2 +1,2 @@
-language = "python"
-run = "pip install -r requirements.txt && python main.py"
+language = "python3"
+run = "pip install openai requests beautifulsoup4 --user && python3 main.py"
