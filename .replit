@@ -1,2 +1,14 @@
 language = "python3"
 run = "pip install openai requests beautifulsoup4 --user && python3 main.py"
+
+[workflows]
+runButton = "Run"
+
+[[workflows.workflow]]
+name = "Run"
+author = 40158653
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
