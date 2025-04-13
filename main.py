@@ -23,7 +23,7 @@ def async_task_with_progress(task_func, progress_desc, *args, **kwargs):
     비동기로 작업을 실행하면서 진행 상태를 표시합니다.
     """
     result = [None]
-    exception = {}
+    exception = [None]
     completed = [False]
 
     def worker():
@@ -87,18 +87,21 @@ def main():
         reviews = async_task_with_progress(
             get_reviews,
             f"'{title}' 리뷰 수집 중",
-            title
-        )
-
-        Progress.step_progress(steps, 2)
-
-        # 리뷰 분석
-        review_points = async_task_with_progress(
-            process_reviews,
-            "리뷰 분석 중",
             title,
-            reviews
+            author
         )
+        if not reviews:
+            print("\n⚠️ 리뷰를 수집하지 못했습니다. 리뷰가 없는 책일 수 있습니다.")
+            review_points=[]
+        else:
+            Progress.step_progress(steps, 2)
+            # 리뷰 분석
+            review_points = async_task_with_progress(
+                process_reviews,
+                "리뷰 분석 중",
+                title,
+                reviews
+            )
 
         Progress.step_progress(steps, 3)
 
